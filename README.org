@@ -1,0 +1,7 @@
+#+Title: A Research Notebook → Org-mode System
+
+The goal of this repo is to capture a pipeline from my handwritten
+notebook into orgmode.
+
+Right now the workflow looks like this: paper notebook -> Scan with
+phone -> auto-upload folder -> auto-rename script -> link into org-mode
