@@ -1,32 +1,58 @@
-import os
-import datetime
-# DEST_DIR = "~/workspace/scans"
-
-import os
+import argparse
 import time
-import subprocess
+import datetime
+from pathlib import Path
 
-SCAN_DIR = "~/Documents/scans/inbox"
+from paddleocr import PaddleOCR
 
-# I want to do somethin where I check the photos I took today, if they "look like" a notebook photo, I move them into that folder. 
+SCAN_DIR = Path("~/Documents/scans/inbox").expanduser()
+DEST_DIR = Path("~/Documents/scans/processed").expanduser()
+SUPPORTED_EXTS = {".pdf", ".jpg", ".jpeg", ".png"}
 
-# I should probably do this with cron.
-while True:
-    for f in os.listdir(os.path.expanduser(SCAN_DIR)):
-        if f.endswith(".pdf"):
-            path = os.path.join(os.path.expanduser(SCAN_DIR), f)
+ocr = PaddleOCR(
+    text_detection_model_name="PP-OCRv5_mobile_det",
+    text_recognition_model_name="PP-OCRv5_mobile_rec",
+    use_doc_orientation_classify=False,
+    use_doc_unwarping=False,
+    use_textline_orientation=False,
+)
 
-            subprocess.run(["ocrmypdf", path, path])
-            print("Processed:", f)
 
-    time.sleep(60)
+def extract_text(path: Path) -> str:
+    result = ocr.predict(str(path))
+    lines = []
+    for page in result:
+        lines.extend(page.json["res"]["rec_texts"])
+    return "\n".join(lines)
 
-# THis is for renaming
-for file in os.listdir(SCAN_DIR):
-    if file.endswith(".pdf"):
-        date = datetime.date.today().isoformat()
-        new_name = f"{date}_notes.pdf"
-        os.rename(
-            os.path.join(SCAN_DIR, file),
-            os.path.join(DEST_DIR, new_name)
-        )
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--file", type=Path, help="OCR a single file, print to stdout, and exit.")
+    args = parser.parse_args()
+
+    if args.file:
+        print(extract_text(args.file))
+        return
+
+    DEST_DIR.mkdir(parents=True, exist_ok=True)
+
+    while True:
+        for f in SCAN_DIR.iterdir():
+            if f.suffix.lower() not in SUPPORTED_EXTS:
+                continue
+
+            text = extract_text(f)
+
+            date = datetime.date.today().isoformat()
+            org_path = DEST_DIR / f"{date}_{f.stem}.org"
+            org_path.write_text(text)
+
+            f.rename(DEST_DIR / f.name)
+            print("Processed:", f.name)
+
+        time.sleep(60)
+
+
+if __name__ == "__main__":
+    main()
