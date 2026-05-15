@@ -1,0 +1,1 @@
+Delete this file and place desired documents for categorization here.
